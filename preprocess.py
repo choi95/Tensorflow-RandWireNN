@@ -6,12 +6,14 @@ def load_data(args):
         train_ds, test_ds = tfds.load('cifar10', split=['train','test'], as_supervised=True)
         
         def train_augmentation(image, label):
-            image = tf.image.random_crop(image, (32,32,50000))
+            image = tf.image.convert_image_dtype(image, tf.float32)
+            image = tf.image.random_crop(image, (32,32,3))
             image = tf.image.random_flip_up_down(image)
             image = tf.image.per_image_standardization(image)
             return image, label
 
         def test_augmentation(image, label):
+            image = tf.image.convert_image_dtype(image, tf.float32)
             image = tf.image.per_image_standardization(image)
             return image, label
 
@@ -23,12 +25,14 @@ def load_data(args):
         train_ds, test_ds = tfds.load('cifar100', split=['train','test'], as_supervised=True)
         
         def train_augmentation(image, label):
+            image = tf.image.convert_image_dtype(image, tf.float32)
             image = tf.image.random_crop(image, (32,32,50000))
             image = tf.image.random_flip_up_down(image)
             image = tf.image.per_image_standardization(image)
             return image, label
 
         def test_augmentation(image, label):
+            image = tf.image.convert_image_dtype(image, tf.float32)
             image = tf.image.per_image_standardization(image)
             return image, label
             
@@ -40,12 +44,14 @@ def load_data(args):
         train_ds, test_ds = tfds.load('MNIST', split=['train','test'], as_supervised=True)
         
         def train_augmentation(image, label):
+            image = tf.image.convert_image_dtype(image, tf.float32)
             image = tf.image.random_crop(image, (28,28,50000))
             image = tf.image.random_flip_up_down(image)
             image = tf.image.per_image_standardization(image)
             return image, label
 
         def test_augmentation(image, label):
+            image = tf.image.convert_image_dtype(image, tf.float32)
             image = tf.image.per_image_standardization(image)
             return image, label
             

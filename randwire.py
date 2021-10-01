@@ -6,12 +6,11 @@ from graph import RandomGraph
 # https://github.com/tstandley/Xception-PyTorch/blob/master/xception.py
 # Reporting 1,
 # I don't know which one is better, between 'bias=False' and 'bias=True'
-class SeparableConv2d(tf.Module):
+class SeparableConv2d(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size=3, stride=1, padding='same'):
         super(SeparableConv2d, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding),
-        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding),
-        # self.apply(weights_init)
+        self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding)
+        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding)
 
     def call(self, x):
         x = self.conv(x)
@@ -20,7 +19,7 @@ class SeparableConv2d(tf.Module):
 
 
 # ReLU-convolution-BN triplet
-class Unit(tf.Module):
+class Unit(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size, stride=1):
         super(Unit, self).__init__()
 
@@ -39,30 +38,27 @@ class Unit(tf.Module):
 
 # Reporting 2,
 # In the paper, they said "The aggregation is done by weighted sum with learnable positive weights".
-class Node(tf.Module):
+class Node(tf.keras.layers.Layer):
     def __init__(self, in_degree, filters, kernel_size, stride=1):
         super(Node, self).__init__()
         self.in_degree = in_degree
         if len(self.in_degree) > 1:
             # self.weights = nn.Parameter(torch.zeros(len(self.in_degree), requires_grad=True))
-            self.weights = tf.Variable(tf.ones(len(self.in_degree)))
+            self.w = tf.Variable(tf.ones(len(self.in_degree)))
         self.unit = Unit(filters, kernel_size, stride=stride)
 
     def call(self, *input):
         if len(self.in_degree) > 1:
-            x = (input[0] * tf.sigmoid(self.weights[0]))
+            x = (input[0] * tf.sigmoid(self.w[0]))
             for index in range(1, len(input)):
-                x += (input[index] * tf.sigmoid(self.weights[index]))
+                x += (input[index] * tf.sigmoid(self.w[index]))
             out = self.unit(x)
-            # different paper, add identity mapping
-            # out += x
         else:
             out = self.unit(input[0])
         return out
+        
+class RandWire(tf.keras.layers.Layer):
 
-
-class RandWire(tf.Module):
-   
     def __init__(self, node_num, p, filters, kernerl_size, graph_mode, is_train, name):
         super(RandWire, self).__init__()
         self.node_num = node_num
@@ -72,7 +68,6 @@ class RandWire(tf.Module):
         self.graph_mode = graph_mode
         self.is_train = is_train
         #self.name = name
-
         #get graph nodes and in edges
         graph_node = RandomGraph(self.node_num, self.p, graph_mode=graph_mode)
         if self.is_train is True:
@@ -83,29 +78,35 @@ class RandWire(tf.Module):
         else:
             graph = graph_node.load_random_graph(name)
             self.nodes, self.in_edges = graph_node.get_graph_info(graph)
-
+        
         #define input Node
         self.module_list = [Node(self.in_edges[0], self.filters, self.kernerl_size)]
         # define the rest Node
-        self.module_list.append([Node(self.in_edges[node], self.kernerl_size, self.kernerl_size) for node in self.nodes if node > 0])
+        self.module_list.extend([Node(self.in_edges[node], self.kernerl_size, self.kernerl_size) for node in self.nodes if node > 0])
 
     def call(self, x):
         memory = {}
         # start vertex
-        out = self.module_list[0]
-        
-        
-        memory[0] = out.call
+        out = self.module_list[0](x)
+        memory[0] = out
 
         # the rest vertex
         for node in range(1, len(self.nodes) - 1):
             # print(node, self.in_edges[node][0], self.in_edges[node])
             if len(self.in_edges[node]) > 1:
-                out = self.module_list[node].call(*[memory[in_vertex] for in_vertex in self.in_edges[node]])
-            else:
-                out = self.module_list[node]
                 
-            memory[node] = out(memory[self.in_edges[node][0]])
+                out = self.module_list[node](*[memory[in_vertex] for in_vertex in self.in_edges[node]])
+            else:          
+                out = self.module_list[node](memory[self.in_edges[node][0]])
+            memory[node] = out
+ 
+        for node in range(1, len(self.nodes) - 1):
+            # print(node, self.in_edges[node][0], self.in_edges[node])
+            if len(self.in_edges[node]) > 1:
+                out = self.module_list[node](*[memory[in_vertex] for in_vertex in self.in_edges[node]])
+            else:
+                out = self.module_list[node](memory[self.in_edges[node][0]])
+                memory[node] = out
 
         # Reporting 3,
         # How do I handle the last part?
