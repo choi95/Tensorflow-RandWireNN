@@ -6,8 +6,26 @@ from tqdm import tqdm
 from model import Model
 from preprocess import load_data
 from tensorflow import keras
+import keras
+from keras.datasets import cifar10
+from keras.preprocessing.image import ImageDataGenerator
+import requests
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from keras.utils import np_utils
+
+requests.packages.urllib3.disable_warnings()
+import ssl
+
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 def main():
     parser = argparse.ArgumentParser('parameters')
@@ -31,14 +49,14 @@ def main():
     train_dataset, eval_dataset = load_data(args)
 
     if args.load_model:
-        model = Model(args.node_num, args.p, args.c, args.c, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
+        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
         filename = "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
         checkpoint = tf.load_weight('./checkpoint/' + filename + 'ckpt.t7')
         epoch = checkpoint['epoch']
         acc = checkpoint['acc']
         print("Load Model Accuracy: ", acc, "Load Model end epoch: ", epoch)
     else:
-        model = Model(args.node_num, args.p, args.c, args.c, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
+        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
     
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
     #criterion = tf.keras.losses.CategoricalCrossentropy()
@@ -94,6 +112,7 @@ def main():
             print("Training time: ", time.time() - start_time)
             f.write("Training time: " + str(time.time() - start_time))
             f.write("\n")
+        
 
 
 if __name__ == '__main__':
