@@ -2,17 +2,9 @@ import tensorflow as tf
 import argparse
 import os
 import time
-from tqdm import tqdm
 from model import Model
 from preprocess import load_data
-from tensorflow import keras
-import keras
-from keras.datasets import cifar10
-from keras.preprocessing.image import ImageDataGenerator
 import requests
-
-from keras.utils import np_utils
-
 requests.packages.urllib3.disable_warnings()
 import ssl
 
@@ -47,24 +39,32 @@ def main():
     args = parser.parse_args()
 
     train_dataset, eval_dataset = load_data(args)
+    
+    inputs = tf.keras.Input(shape=(32,32,3))
 
     if args.load_model:
-        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
+        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train, args.batch_size)
         filename = "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
         checkpoint = tf.load_weight('./checkpoint/' + filename + 'ckpt.t7')
         epoch = checkpoint['epoch']
         acc = checkpoint['acc']
         print("Load Model Accuracy: ", acc, "Load Model end epoch: ", epoch)
     else:
-        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
-    
+        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train, args.batch_size)
+    model.build((args.batch_size,32,32,3))
+  
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
-    #criterion = tf.keras.losses.CategoricalCrossentropy()
-    #lr_history = LearningRate()
     callback = tf.keras.callbacks.LearningRateScheduler(
         lambda epoch: args.learning_rate * (0.1 ** (epoch // 30)),
         verbose=True
     )
+    
+    #model = tf.keras.Model(inputs=inputs, outputs=model)
+    
+    
+    output = model(inputs)
+    model = tf.keras.Model(inputs, output)
+    
     model.compile(loss=tf.keras.metrics.categorical_crossentropy, optimizer=optimizer)
 
     epoch_list = []
@@ -73,24 +73,23 @@ def main():
     train_acc_list = []
     train_loss_list = []
     max_test_acc = 0
+
     if not os.path.isdir("reporting"):
         os.mkdir("reporting")
 
     start_time = time.time()
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
         for epoch in range(1, args.epochs + 1):
-            # scheduler = CosineAnnealingLR(optimizer, epoch)
+            print('*****')
             epoch_list.append(epoch)
 
-            #model.compile(loss=tf.keras.metrics.categorical_crossentropy, optimizer=optimizer)
-            #for x, y in train_dataset:
-            model.fit(train_dataset, epochs=epoch, validation_data=eval_dataset, steps_per_epoch=100, validation_steps=10, callbacks=[callback], batch_size=2)
+            model.fit(train_dataset, epochs=epoch, validation_data=eval_dataset, steps_per_epoch=60000//args.batch_size, validation_steps=10, callbacks=[callback])
+            print('-----')
             test_acc, test_loss = model.evaluate(eval_dataset)
-
+            print('$$$$$')
             test_acc_list.append(test_acc)
             test_loss_list.append(test_loss)
-            #train_loss_list.append(train_loss)
-            #train_acc_list.append(train_acc)
+
             print('Test set accuracy: {0:.2f}%, Best accuracy: {1:.2f}%'.format(test_acc, max_test_acc))
             f.write("[Epoch {0:3d}] Test set accuracy: {1:.3f}%, , Best accuracy: {2:.2f}%".format(epoch, test_acc, max_test_acc))
             f.write("\n ")
@@ -108,7 +107,6 @@ def main():
                     args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
                 tf.save(state, './checkpoint/' + filename + 'ckpt.t7')
                 max_test_acc = test_acc
-                #draw_plot(epoch_list, train_loss_list, train_acc_list, test_acc_list)
             print("Training time: ", time.time() - start_time)
             f.write("Training time: " + str(time.time() - start_time))
             f.write("\n")

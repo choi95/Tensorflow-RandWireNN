@@ -10,7 +10,7 @@ class SeparableConv2d(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size=3, stride=1, padding='same'):
         super(SeparableConv2d, self).__init__()
         self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding)
-        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size=1, padding=padding)
+        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding)
 
     def call(self, x):
         x = self.conv(x)
@@ -67,17 +67,17 @@ class RandWire(tf.keras.layers.Layer):
         self.kernerl_size = kernerl_size
         self.graph_mode = graph_mode
         self.is_train = is_train
-        #self.name = name
+        self.gname = name
         #get graph nodes and in edges
         graph_node = RandomGraph(self.node_num, self.p, graph_mode=graph_mode)
         if self.is_train is True:
             print("is_train: True")
             graph = graph_node.make_graph()
             self.nodes, self.in_edges = graph_node.get_graph_info(graph)
-            graph_node.save_random_graph(graph, name)
+            graph_node.save_random_graph(graph, self.gname)
         else:
-            graph = graph_node.load_random_graph(name)
-            self.nodes, self.in_edges = graph_node.get_graph_info(graph)
+            graph = graph_node.load_random_graph(self.gname)
+            self.nodes, self.in_edges = graph_node.get_graph_info(self.graph)
         
         #define input Node
         self.module_list = [Node(self.in_edges[0], self.filters, self.kernerl_size)]
