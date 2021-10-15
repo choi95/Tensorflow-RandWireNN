@@ -9,8 +9,8 @@ from graph import RandomGraph
 class SeparableConv2d(tf.keras.layers.Layer):
     def __init__(self, filters, kernel_size=3, stride=1, padding='same'):
         super(SeparableConv2d, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding)
-        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding)
+        self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding, name='separableconv')
+        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding, name='separableconv_pointwise')
 
     def call(self, x):
         x = self.conv(x)

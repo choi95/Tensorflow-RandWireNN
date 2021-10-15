@@ -19,7 +19,7 @@ def load_data(args):
             return image, label
 
         train = train_ds.map(train_augmentation).shuffle(100).batch(args.batch_size).repeat()
-        test = test_ds.map(test_augmentation).cache().batch(args.batch_size)
+        test = test_ds.map(test_augmentation).shuffle(100).batch(args.batch_size).repeat()
         return train, test
 
     elif args.dataset_mode is "CIFAR100":

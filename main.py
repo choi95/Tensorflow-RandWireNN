@@ -2,7 +2,7 @@ import tensorflow as tf
 import argparse
 import os
 import time
-from model import Model
+from model import Custom_Model
 from preprocess import load_data
 import requests
 requests.packages.urllib3.disable_warnings()
@@ -38,20 +38,21 @@ def main():
 
     args = parser.parse_args()
 
-    train_dataset, eval_dataset = load_data(args)
+    train_dataset, test_dataset = load_data(args)
     
-    inputs = tf.keras.Input(shape=(32,32,3))
+    inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
 
     if args.load_model:
-        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train, args.batch_size)
+        custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
         filename = "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
         checkpoint = tf.load_weight('./checkpoint/' + filename + 'ckpt.t7')
         epoch = checkpoint['epoch']
         acc = checkpoint['acc']
         print("Load Model Accuracy: ", acc, "Load Model end epoch: ", epoch)
     else:
-        model = Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train, args.batch_size)
-    model.build((args.batch_size,32,32,3))
+        custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
+    
+    #model.build((args.batch_size,32,32,3))
   
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
     callback = tf.keras.callbacks.LearningRateScheduler(
@@ -59,13 +60,12 @@ def main():
         verbose=True
     )
     
-    #model = tf.keras.Model(inputs=inputs, outputs=model)
-    
-    
-    output = model(inputs)
+    output = custom_model(inputs)
     model = tf.keras.Model(inputs, output)
     
     model.compile(loss=tf.keras.metrics.categorical_crossentropy, optimizer=optimizer)
+    model.build(input_shape=next(iter(train_dataset))[0].shape)
+    model.summary()
 
     epoch_list = []
     test_loss_list = []
@@ -76,6 +76,8 @@ def main():
 
     if not os.path.isdir("reporting"):
         os.mkdir("reporting")
+    
+    
 
     start_time = time.time()
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
@@ -83,9 +85,9 @@ def main():
             print('*****')
             epoch_list.append(epoch)
 
-            model.fit(train_dataset, epochs=epoch, validation_data=eval_dataset, steps_per_epoch=60000//args.batch_size, validation_steps=10, callbacks=[callback])
+            model.fit(train_dataset, batch_size=args.batch_size, epochs=epoch, validation_data=test_dataset, steps_per_epoch=60000//args.batch_size, validation_steps=10, callbacks=[callback])
             print('-----')
-            test_acc, test_loss = model.evaluate(eval_dataset)
+            test_acc, test_loss = model.evaluate(test_dataset)
             print('$$$$$')
             test_acc_list.append(test_acc)
             test_loss_list.append(test_loss)
