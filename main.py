@@ -52,8 +52,6 @@ def main():
     else:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
     
-    #model.build((args.batch_size,32,32,3))
-  
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
     callback = tf.keras.callbacks.LearningRateScheduler(
         lambda epoch: args.learning_rate * (0.1 ** (epoch // 30)),
@@ -76,19 +74,17 @@ def main():
 
     if not os.path.isdir("reporting"):
         os.mkdir("reporting")
-    
-    
 
     start_time = time.time()
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
         for epoch in range(1, args.epochs + 1):
-            print('*****')
+            
             epoch_list.append(epoch)
 
             model.fit(train_dataset, batch_size=args.batch_size, epochs=epoch, validation_data=test_dataset, steps_per_epoch=60000//args.batch_size, validation_steps=10, callbacks=[callback])
-            print('-----')
+         
             test_acc, test_loss = model.evaluate(test_dataset)
-            print('$$$$$')
+        
             test_acc_list.append(test_acc)
             test_loss_list.append(test_loss)
 

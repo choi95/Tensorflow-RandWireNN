@@ -33,31 +33,34 @@ class Custom_Model(tf.keras.models.Model):
             self.CIFAR_conv3 = RandWire(self.node_num, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="CIFAR10_conv3")
             self.CIFAR_conv4 = RandWire(self.node_num, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="CIFAR10_conv4")
             self.CIFAR_classifier = tf.keras.layers.Conv2D(self.filters, kernel_size=1, strides=(1, 1), padding='same', name="CIFAR10_classifier")       
-            self.BatchNormalization = tf.keras.layers.BatchNormalization(name="CIFAR10_input")     
-        '''
+            self.BatchNormalization = tf.keras.layers.BatchNormalization(name="CIFAR10_batch")     
+    
         elif self.model_mode is "CIFAR100":
-            self.CIFAR100_conv1 = Conv_Layer1(self.filters, kernel_size=3, padding='same')
+            self.input_layer = tf.keras.layers.InputLayer(input_shape=(32,32,3), name="CIFAR100_input")
+            self.CIFAR100_conv1 = tf.keras.layers.Conv2D(filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="CIFAR100_conv1")     
             self.CIFAR100_conv2 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 2, self.graph_mode, self.is_train, name="CIFAR100_conv2")           
             self.CIFAR100_conv3 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 4, self.graph_mode, self.is_train, name="CIFAR100_conv3")
             self.CIFAR100_conv4 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 8, self.graph_mode, self.is_train, name="CIFAR100_conv4")            
-            self.CIFAR100_classifier = Classifier_Layer(self.filters, kernel_size=1, padding='same'),
+            self.CIFAR100_classifier = tf.keras.layers.Conv2D(self.filters, kernel_size=1, strides=(1, 1), padding='same', name="CIFAR100_classifier")
     
         elif self.model_mode is "SMALL_REGIME":
-            self.SMALL_conv1 = Conv_Layer1(self.filters, kernel_size=3, padding='same')
-            self.SMALL_conv2 = Conv_Layer2(self.filters, kernel_size=3, padding='same')
+            self.input_layer = tf.keras.layers.InputLayer(input_shape=(32,32,3), name="SMALL_input")
+            self.SMALL_conv1 = tf.keras.layers.Conv2D(filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="SMALL_conv1")     
+            self.SMALL_conv2 = tf.keras.layers.Conv2D(self.filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="SMALL_conv2")   
             self.SMALL_conv3 = RandWire(self.node_num, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="SMALL_conv3")
             self.SMALL_conv4 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 2, self.graph_mode, self.is_train, name="SMALL_conv4")
             self.SMALL_conv5 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 4, self.graph_mode, self.is_train, name="SMALL_conv5")            
-            self.SMALL_classifier = Classifier_Layer(self.filters, kernel_size=1, padding='same'),
+            self.SMALL_classifier = tf.keras.layers.Conv2D(self.filters, kernel_size=1, strides=(1, 1), padding='same', name="SMALL_classifier")
     
         elif self.model_mode is "REGULAR_REGIME":
-            self.REGULAR_conv1 = Conv_Layer1(self.filters, kernel_size=3, padding='same')
+            self.input_layer = tf.keras.layers.InputLayer(input_shape=(32,32,3), name="REGULAR_input")
+            self.REGULAR_conv1 = tf.keras.layers.Conv2D(filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="REGULAR_conv1")   
             self.REGULAR_conv2 = RandWire(self.node_num // 2, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="REGULAR_conv2")
             self.REGULAR_conv3 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 2, self.graph_mode, self.is_train, name="REGULAR_conv3")           
             self.REGULAR_conv4 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 4, self.graph_mode, self.is_train, name="REGULAR_conv4")         
             self.REGULAR_conv5 = RandWire(self.node_num, self.p, self.filters, self.kernel_size * 8, self.graph_mode, self.is_train, name="REGULAR_conv5")
-            self.REGULAR_classifier = Classifier_Layer(self.filters, kernel_size=1, padding='same'),
-    '''
+            self.REGULAR_classifier = tf.keras.layers.Conv2D(self.filters, kernel_size=1, strides=(1, 1), padding='same', name="REGULAR_classifier")
+    
         self.Dropout = tf.keras.layers.Dropout(self.dropout_rate)
         self.Dense = tf.keras.layers.Dense(1)
             
@@ -65,18 +68,14 @@ class Custom_Model(tf.keras.models.Model):
     def call(self, x):
         if self.model_mode is "CIFAR10":
             out = self.CIFAR_conv1(x)     
-            out = self.BatchNormalization(out)
-            print('***', out.shape)
+            out = self.BatchNormalization(out)         
             out = self.CIFAR_conv2(out) 
-            out = self.BatchNormalization(out)   
-            print('***', out.shape)     
-            out = self.CIFAR_conv3(out)   
-            print('***', out.shape)  
-            out = self.CIFAR_conv4(out)   
-            print('***', out.shape)
+            out = self.BatchNormalization(out)              
+            out = self.CIFAR_conv3(out)         
+            out = self.CIFAR_conv4(out)         
             out = self.CIFAR_classifier(out)
             out = self.BatchNormalization(out)
-            print('***', out.shape)
+            
         elif self.model_mode is "CIFAR100":
             out = self.CIFAR100_conv1(x)
             out = self.CIFAR100_conv2(out)

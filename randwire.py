@@ -24,16 +24,17 @@ class Unit(tf.keras.layers.Layer):
         super(Unit, self).__init__()
 
         self.dropout_rate = 0.2
-
-        self.unit = tf.keras.Sequential([
-            tf.keras.layers.ReLU(),
-            SeparableConv2d(filters, kernel_size, stride=stride),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Dropout(self.dropout_rate)
-        ])
+        self.SeparableConv2d = SeparableConv2d(filters, kernel_size, stride=stride)
+        self.BatchNormalization = tf.keras.layers.BatchNormalization()
+        self.ReLU = tf.keras.layers.ReLU()
+        self.Dropout_rate = tf.keras.layers.Dropout(self.dropout_rate)
 
     def call(self, x):
-        return self.unit(x)
+        x = self.SeparableConv2d(x)
+        x = self.BatchNormalization(x)
+        x = self.ReLU=(x)
+        x = self.Dropout_rate(x)
+        return x
 
 
 # Reporting 2,
