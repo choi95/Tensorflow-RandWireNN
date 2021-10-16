@@ -18,8 +18,8 @@ def load_data(args):
             image = tf.image.per_image_standardization(image)
             return image, label
 
-        train = train_ds.map(train_augmentation).shuffle(100).batch(args.batch_size).repeat()
-        test = test_ds.map(test_augmentation).shuffle(100).batch(args.batch_size).repeat()
+        train = train_ds.map(train_augmentation).shuffle(100).batch(args.batch_size)
+        test = test_ds.map(test_augmentation).shuffle(100).batch(args.batch_size)
         return train, test
 
     elif args.dataset_mode is "CIFAR100":

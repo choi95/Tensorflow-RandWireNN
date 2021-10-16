@@ -52,24 +52,34 @@ def main():
     else:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
     
+    checkpoint_path = "training_2/cp-{epoch:04d}.ckpt"
+
     optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
     callback = tf.keras.callbacks.LearningRateScheduler(
         lambda epoch: args.learning_rate * (0.1 ** (epoch // 30)),
         verbose=True
     )
-    
+
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_path, 
+    verbose=1, 
+    save_weights_only=True,
+    )
+
     output = custom_model(inputs)
     model = tf.keras.Model(inputs, output)
     
-    model.compile(loss=tf.keras.metrics.categorical_crossentropy, optimizer=optimizer)
+
+
+    model.compile(loss=tf.keras.metrics.categorical_crossentropy, metrics=['accuracy'], optimizer=optimizer)
     model.build(input_shape=next(iter(train_dataset))[0].shape)
+    
+    print(model.inputs)
     model.summary()
 
     epoch_list = []
     test_loss_list = []
     test_acc_list = []
-    train_acc_list = []
-    train_loss_list = []
     max_test_acc = 0
 
     if not os.path.isdir("reporting"):
@@ -81,9 +91,10 @@ def main():
             
             epoch_list.append(epoch)
 
-            model.fit(train_dataset, batch_size=args.batch_size, epochs=epoch, validation_data=test_dataset, steps_per_epoch=60000//args.batch_size, validation_steps=10, callbacks=[callback])
+            model.fit(train_dataset, batch_size=args.batch_size, epochs=epoch, validation_data=test_dataset, 
+                    steps_per_epoch=int(50000//args.batch_size), validation_steps=int(10000//args.batch_size), callbacks=[callback, cp_callback])
          
-            test_acc, test_loss = model.evaluate(test_dataset)
+            test_loss, test_acc = model.evaluate(test_dataset)
         
             test_acc_list.append(test_acc)
             test_loss_list.append(test_loss)
@@ -95,15 +106,18 @@ def main():
             if max_test_acc < test_acc:
                 print('Saving..')
                 state = {
-                    'model': model.state_dict(),
                     'acc': test_acc,
                     'epoch': epoch,
                 }
                 if not os.path.isdir('checkpoint'):
                     os.mkdir('checkpoint')
-                filename = "c_" + str(args.c) + "_p_" + str(
-                    args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
-                tf.save(state, './checkpoint/' + filename + 'ckpt.t7')
+                #filename = "c_" + str(args.c) + "_p_" + str(
+                #    args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
+                #tf.save(state, './checkpoint/' + filename + 'ckpt.t7')
+                saved_model_path = "/checkpoint"
+
+                tf.saved_model.save(custom_model, saved_model_path)
+
                 max_test_acc = test_acc
             print("Training time: ", time.time() - start_time)
             f.write("Training time: " + str(time.time() - start_time))
