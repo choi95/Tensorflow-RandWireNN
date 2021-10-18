@@ -32,7 +32,7 @@ class Unit(tf.keras.layers.Layer):
     def call(self, x):
         x = self.SeparableConv2d(x)
         x = self.BatchNormalization(x)
-        x = self.ReLU=(x)
+        x = self.ReLU(x)
         x = self.Dropout_rate(x)
         return x
 

@@ -18,6 +18,47 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+class MyLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+    
+  def __init__(self, initial_learning_rate):
+    self.initial_learning_rate = initial_learning_rate
+
+  def __call__(self, epoch):
+     return self.initial_learning_rate * (0.1 ** (epoch // 30))
+     
+
+@tf.function
+def train_step(images, labels, model, optimizer, loss_function, loss_metric, accuracy_metric):
+    # 미분을 위한 GradientTape을 적용합니다.
+    with tf.GradientTape() as tape:
+        # 1. 예측 (prediction)
+        predictions = model(images)
+        # 2. Loss 계산
+        pred_loss = loss_function(labels, predictions)
+    
+    # 3. 그라디언트(gradients) 계산
+    gradients = tape.gradient(pred_loss, model.trainable_variables)
+    
+    # 4. 오차역전파(Backpropagation) - weight 업데이트
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    
+    # loss와 accuracy를 업데이트 합니다.
+    loss_metric.update_state(pred_loss)
+    accuracy_metric.update_state(labels, predictions)
+
+@tf.function
+def test_step(images, labels, model, loss_function, test_loss, test_acc):
+    # 1. 예측 (prediction)
+    predictions = model(images)
+    # 2. Loss 계산
+    loss = loss_function(labels, predictions)
+    
+    # Test셋에 대해서는 gradient를 계산 및 backpropagation 하지 않습니다.
+    
+    # loss와 accuracy를 업데이트 합니다.
+    test_loss(loss)
+    test_acc(labels, predictions)
+
 
 def main():
     parser = argparse.ArgumentParser('parameters')
@@ -39,7 +80,7 @@ def main():
     args = parser.parse_args()
 
     train_dataset, test_dataset = load_data(args)
-    
+
     inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
 
     if args.load_model:
@@ -52,77 +93,70 @@ def main():
     else:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
     
-    checkpoint_path = "training_2/cp-{epoch:04d}.ckpt"
-
-    optimizer = tf.keras.optimizers.SGD(learning_rate=args.learning_rate, momentum=0.9)
-    callback = tf.keras.callbacks.LearningRateScheduler(
-        lambda epoch: args.learning_rate * (0.1 ** (epoch // 30)),
-        verbose=True
-    )
-
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath=checkpoint_path, 
-    verbose=1, 
-    save_weights_only=True,
-    )
-
     output = custom_model(inputs)
     model = tf.keras.Model(inputs, output)
     
-
-
-    model.compile(loss=tf.keras.metrics.categorical_crossentropy, metrics=['accuracy'], optimizer=optimizer)
-    model.build(input_shape=next(iter(train_dataset))[0].shape)
-    
-    print(model.inputs)
     model.summary()
 
-    epoch_list = []
-    test_loss_list = []
-    test_acc_list = []
+    model.build(input_shape=next(iter(train_dataset))[0].shape)
+    
     max_test_acc = 0
 
     if not os.path.isdir("reporting"):
         os.mkdir("reporting")
+    
+    train_loss_history = []
+    accuracy_history = []
 
     start_time = time.time()
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
+        
+        #optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+        loss_function = tf.keras.losses.SparseCategoricalCrossentropy()
+        loss_metric = tf.keras.metrics.Mean(name='train_loss')
+        accuracy_metric = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
+            
+
         for epoch in range(1, args.epochs + 1):
             
-            epoch_list.append(epoch)
+            myLRSchedule = MyLRSchedule(args.learning_rate)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=myLRSchedule(epoch), momentum=0.9)
+            
+            
+            loss_metric.reset_states()
+            accuracy_metric.reset_states()
 
-            model.fit(train_dataset, batch_size=args.batch_size, epochs=epoch, validation_data=test_dataset, 
-                    steps_per_epoch=int(50000//args.batch_size), validation_steps=int(10000//args.batch_size), callbacks=[callback, cp_callback])
-         
-            test_loss, test_acc = model.evaluate(test_dataset)
+            for images, labels in train_dataset:
+                train_step(images, labels, model, optimizer, loss_function, loss_metric, accuracy_metric)
         
-            test_acc_list.append(test_acc)
-            test_loss_list.append(test_loss)
+            for test_images, test_labels in test_dataset:
+                #print(test_images, test_labels)
+                test_step(test_images, test_labels, model, loss_function, loss_metric, accuracy_metric)
+            
+            train_loss_history.append(loss_metric.result())
+            accuracy_history.append(accuracy_metric.result())
+            print(f'Epoch {epoch}, Loss {loss_metric.result()}, Accuracy {accuracy_metric.result()}')
 
-            print('Test set accuracy: {0:.2f}%, Best accuracy: {1:.2f}%'.format(test_acc, max_test_acc))
-            f.write("[Epoch {0:3d}] Test set accuracy: {1:.3f}%, , Best accuracy: {2:.2f}%".format(epoch, test_acc, max_test_acc))
+            #template = '에포크: {}, 손실: {:.5f}, 정확도: {:.2f}%, 테스트 손실: {:.5f}, 테스트 정확도: {:.2f}%'
+            #print (template.format(epoch+1, train_loss.result(), train_acc.result(),test_loss.result(), test_acc.result()))
+
+            f.write("[Epoch {0:3d}] Test set accuracy: {1:.3f}%, , Best accuracy: {2:.2f}%".format(epoch, accuracy_metric.result(), max_test_acc))
             f.write("\n ")
-
-            if max_test_acc < test_acc:
+            
+            if max_test_acc < accuracy_metric.result():
                 print('Saving..')
-                state = {
-                    'acc': test_acc,
-                    'epoch': epoch,
-                }
+                
                 if not os.path.isdir('checkpoint'):
                     os.mkdir('checkpoint')
-                #filename = "c_" + str(args.c) + "_p_" + str(
-                #    args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
-                #tf.save(state, './checkpoint/' + filename + 'ckpt.t7')
                 saved_model_path = "/checkpoint"
 
                 tf.saved_model.save(custom_model, saved_model_path)
 
-                max_test_acc = test_acc
+                max_test_acc = accuracy_metric.result()
             print("Training time: ", time.time() - start_time)
             f.write("Training time: " + str(time.time() - start_time))
             f.write("\n")
-        
+            
 
 
 if __name__ == '__main__':
