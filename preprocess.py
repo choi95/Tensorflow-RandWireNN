@@ -31,10 +31,9 @@ def load_data(args):
             image = tf.image.per_image_standardization(image)
             return image, label
         
-        trainDS = trainDS.map(train_augmentation).shuffle(50000).repeat().batch(args.batch_size)
-        testDS = testDS.map(test_augmentation).shuffle(50000).repeat().batch(args.batch_size)
-        #train = train_ds.map(train_augmentation).shuffle(100).batch(args.batch_size).repeat()
-        #test = test_ds.map(test_augmentation).shuffle(100).batch(args.batch_size).repeat()
+        trainDS = trainDS.map(train_augmentation).shuffle(50000).batch(args.batch_size)
+        testDS = testDS.map(test_augmentation).batch(args.batch_size)
+        
         return trainDS, testDS
 
     elif args.dataset_mode is "CIFAR100":
