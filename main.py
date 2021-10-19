@@ -16,27 +16,16 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-class MyLRSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
-    
-  def __init__(self, initial_learning_rate):
-    self.initial_learning_rate = initial_learning_rate
-
-  def __call__(self, epoch):
-     return self.initial_learning_rate * (0.1 ** (epoch // 30))
-
 
 @tf.function
-def train_step(images, labels, model, epoch, optimizer, loss_function, train_loss, train_accuracy):
+def train_step(images, labels, model, optimizer, loss_function, train_loss, train_accuracy):
 
-    with tf.GradientTape() as tape:
-       
+    with tf.GradientTape() as tape: 
         predictions = model(images, training=True)
         pred_loss = loss_function(labels, predictions)
     
-    gradients = tape.gradient(pred_loss, model.trainable_variables)
-    
+    gradients = tape.gradient(pred_loss, model.trainable_variables)  
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    
     train_loss.update_state(pred_loss)
     train_accuracy.update_state(labels, predictions)
 
@@ -44,9 +33,7 @@ def train_step(images, labels, model, epoch, optimizer, loss_function, train_los
 def test_step(images, labels, model, loss_function, test_loss, test_acc):
   
     predictions = model(images, training=False)
-
     loss = loss_function(labels, predictions)
-
     test_loss(loss)
     test_acc(labels, predictions)
 
@@ -72,8 +59,6 @@ def main():
 
     train_dataset, test_dataset = load_data(args)
     
-    inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
-
     if args.load_model:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
         filename = "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
@@ -84,26 +69,19 @@ def main():
     else:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
     
+    inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
     output = custom_model(inputs)
     model = tf.keras.Model(inputs, output)
-    
     model.build(input_shape=next(iter(train_dataset))[0].shape)
 
     max_test_acc = 0
-
-    if not os.path.isdir("reporting"):
-        os.mkdir("reporting")
     
     train_loss_history = []
     accuracy_history = []
 
-    #checkpoint_directory = "/tmp/training_checkpoints"
-    #checkpoint_prefix = os.path.join(checkpoint_directory, "ckpt")
-
+    checkpoint = tf.train.Checkpoint(model)
     
     start_time = time.time()
-
-    checkpoint = tf.train.Checkpoint(model)
 
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
 
@@ -114,26 +92,21 @@ def main():
         test_loss = tf.keras.metrics.Mean(name='test_loss')
         test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
-        
-        #myLRSchedule = MyLRSchedule(args.learning_rate)
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9)
+        schedulers = tf.keras.optimizers.schedules.ExponentialDecay(0.1, 18000, 0.1)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=schedulers, momentum=0.9)
 
         for epoch in range(1, args.epochs + 1):
-            
-            #optimizer = tf.keras.optimizers.SGD(learning_rate=myLRSchedule(epoch), momentum=0.9)
-
+           
             train_loss.reset_states()
             train_accuracy.reset_states()
             test_loss.reset_states()
             test_accuracy.reset_states()
-            
-            
+                       
             for images, labels in train_dataset:   
-                train_step(images, labels, model, epoch, optimizer, loss_function, train_loss, train_accuracy)
+                train_step(images, labels, model, optimizer, loss_function, train_loss, train_accuracy)
             
             for test_images, test_labels in test_dataset:
-                test_step(test_images, test_labels, model, loss_function, test_loss, test_accuracy)
-            
+                test_step(test_images, test_labels, model, loss_function, test_loss, test_accuracy)   
         
             template = 'epoch: {}, train_loss: {:.4f}, train_acc: {:.2%}, test_loss: {:.4f}, test_acc: {:.2%}'
             print (template.format(epoch,
@@ -153,12 +126,6 @@ def main():
                 
                 if not os.path.isdir('checkpoint'):
                     os.mkdir('checkpoint')
-                
-                #checkpoint_path = "checkpoint/cp-{epoch:04d}.ckpt"
-                
-                #checkpoint.save("checkpoint")
-
-                #model.save_weights(checkpoint_path.format(epoch=0))
 
                 max_test_acc = train_accuracy.result()
             print("Training time: ", time.time() - start_time)

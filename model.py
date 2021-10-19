@@ -28,12 +28,12 @@ class Custom_Model(tf.keras.models.Model):
 
         if self.model_mode is "CIFAR10":
             self.input_layer = tf.keras.layers.InputLayer(input_shape=(32,32,3), name="CIFAR10_input")       
-            self.CIFAR_conv1 = tf.keras.layers.Conv2D(32, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="CIFAR10_conv1")        
-            self.CIFAR_conv2 = tf.keras.layers.Conv2D(64, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="CIFAR10_conv2")                   
+            self.CIFAR_conv1 = tf.keras.layers.Conv2D(self.filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="CIFAR10_conv1")        
+            self.CIFAR_conv2 = tf.keras.layers.Conv2D(self.filters, kernel_size=3, strides=(1, 1), padding='same', activation=tf.nn.relu, name="CIFAR10_conv2")                   
             self.CIFAR_conv3 = RandWire(self.node_num, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="CIFAR10_conv3")
             self.CIFAR_conv4 = RandWire(self.node_num, self.p, self.filters, self.kernel_size, self.graph_mode, self.is_train, name="CIFAR10_conv4")
-            self.CIFAR_classifier = tf.keras.layers.Conv2D(64, kernel_size=1, strides=(1, 1), padding='same', name="CIFAR10_classifier")       
-            self.BatchNormalization = tf.keras.layers.BatchNormalization(name="CIFAR10_batch")     
+            self.CIFAR_classifier = tf.keras.layers.Conv2D(self.filters), kernel_size=1, strides=(1, 1), padding='same', name="CIFAR10_classifier")       
+            self.BatchNormalization = tf.keras.layers.BatchNormalization(name="CIFAR10_batch")   
     
         elif self.model_mode is "CIFAR100":
             self.input_layer = tf.keras.layers.InputLayer(input_shape=(32,32,3), name="CIFAR100_input")
