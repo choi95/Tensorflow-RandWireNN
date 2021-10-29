@@ -7,46 +7,45 @@ from graph import RandomGraph
 # Reporting 1,
 # I don't know which one is better, between 'bias=False' and 'bias=True'
 class SeparableConv2d(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size=3, stride=1, padding='same'):
+    def __init__(self, filters, stride=1):
         super(SeparableConv2d, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(filters, kernel_size, stride, padding=padding, name='separableconv')
-        self.pointwise = tf.keras.layers.Conv2D(filters, kernel_size, padding=padding, name='separableconv_pointwise')
+        self.conv = tf.keras.layers.Conv2D(filters, 3, stride, padding='same', name='SeparableConv')
+        self.pointwise = tf.keras.layers.Conv2D(filters, 1, stride, padding='valid', name='SeparableConv_Pointwise')
 
     def call(self, x):
-        x = self.conv(x)
-        x = self.pointwise(x)
-        return x
+        out = self.conv(x)
+        out = self.pointwise(out)
+        return out
 
 
 # ReLU-convolution-BN triplet
 class Unit(tf.keras.layers.Layer):
-    def __init__(self, filters, kernel_size, stride=1):
+    def __init__(self, filters, stride=1):
         super(Unit, self).__init__()
-
         self.dropout_rate = 0.2
-        self.SeparableConv2d = SeparableConv2d(filters, kernel_size, stride=stride)
+        self.SeparableConv2d = SeparableConv2d(filters, stride=stride)
         self.BatchNormalization = tf.keras.layers.BatchNormalization()
         self.ReLU = tf.keras.layers.ReLU()
         self.Dropout_rate = tf.keras.layers.Dropout(self.dropout_rate)
 
     def call(self, x):
-        x = self.SeparableConv2d(x)
-        x = self.BatchNormalization(x)
-        x = self.ReLU(x)
-        x = self.Dropout_rate(x)
-        return x
+        out = self.SeparableConv2d(x)
+        out = self.BatchNormalization(out)
+        out = self.ReLU(out)
+        out = self.Dropout_rate(out)
+        return out
 
 
 # Reporting 2,
 # In the paper, they said "The aggregation is done by weighted sum with learnable positive weights".
 class Node(tf.keras.layers.Layer):
-    def __init__(self, in_degree, filters, kernel_size, stride=1):
+    def __init__(self, in_degree, filters, stride=1):
         super(Node, self).__init__()
         self.in_degree = in_degree
         if len(self.in_degree) > 1:
             # self.weights = nn.Parameter(torch.zeros(len(self.in_degree), requires_grad=True))
             self.w = tf.Variable(tf.ones(len(self.in_degree)))
-        self.unit = Unit(filters, kernel_size, stride=stride)
+        self.unit = Unit(filters, stride=stride)
 
     def call(self, *input):
         if len(self.in_degree) > 1:
@@ -60,12 +59,11 @@ class Node(tf.keras.layers.Layer):
         
 class RandWire(tf.keras.layers.Layer):
 
-    def __init__(self, node_num, p, filters, kernerl_size, graph_mode, is_train, name):
+    def __init__(self, node_num, p, filters, graph_mode, is_train, name):
         super(RandWire, self).__init__()
         self.node_num = node_num
         self.p = p
         self.filters = filters
-        self.kernerl_size = kernerl_size
         self.graph_mode = graph_mode
         self.is_train = is_train
         self.gname = name
@@ -81,9 +79,9 @@ class RandWire(tf.keras.layers.Layer):
             self.nodes, self.in_edges = graph_node.get_graph_info(self.graph)
         
         #define input Node
-        self.module_list = [Node(self.in_edges[0], self.filters, self.kernerl_size)]
+        self.module_list = [Node(self.in_edges[0], self.filters, stride=2)]
         # define the rest Node
-        self.module_list.extend([Node(self.in_edges[node], self.kernerl_size, self.kernerl_size) for node in self.nodes if node > 0])
+        self.module_list.extend([Node(self.in_edges[node], self.filters) for node in self.nodes if node > 0])
 
     def call(self, x):
         memory = {}

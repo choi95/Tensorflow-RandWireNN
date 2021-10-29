@@ -44,7 +44,7 @@ def main():
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs, (default: 100)')
     parser.add_argument('--p', type=float, default=0.75, help='graph probability, (default: 0.75)')
     parser.add_argument('--c', type=int, default=78, help='channel count for each node, (example: 78, 109, 154), (default: 154)')
-    parser.add_argument('--k', type=int, default=4, help='each node is connected to k nearest neighbors in ring topology, (default: 4)')
+    parser.add_argument('--k', type=int, default=3, help='conv2d kernel_size, (default: 3)')
     parser.add_argument('--m', type=int, default=5, help='number of edges to attach from a new node to existing nodes, (default: 5)')
     parser.add_argument('--graph-mode', type=str, default="WS", help="random graph, (Example: ER, WS, BA), (default: WS)")
     parser.add_argument('--node-num', type=int, default=32, help="Number of graph node (default n=32)")
@@ -58,7 +58,7 @@ def main():
     args = parser.parse_args()
 
     train_dataset, test_dataset = load_data(args)
-    
+   
     if args.load_model:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
         filename = "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode
@@ -68,14 +68,12 @@ def main():
         print("Load Model Accuracy: ", acc, "Load Model end epoch: ", epoch)
     else:
         custom_model = Custom_Model(args.node_num, args.p, args.c, args.k, args.graph_mode, args.model_mode, args.dataset_mode, args.is_train)
-    
+
     inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
     output = custom_model(inputs)
     model = tf.keras.Model(inputs, output)
-    model.build(input_shape=next(iter(train_dataset))[0].shape)
-
-    max_test_acc = 0
     
+    max_test_acc = 0  
     train_loss_history = []
     accuracy_history = []
 
@@ -86,17 +84,15 @@ def main():
     with open("./reporting/" + "c_" + str(args.c) + "_p_" + str(args.p) + "_graph_mode_" + args.graph_mode + "_dataset_" + args.dataset_mode + ".txt", "w") as f:
 
         loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        
         train_loss = tf.keras.metrics.Mean(name='train_loss')
         train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
         test_loss = tf.keras.metrics.Mean(name='test_loss')
         test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
-
-        schedulers = tf.keras.optimizers.schedules.ExponentialDecay(0.1, 18000, 0.1)
+        schedulers = tf.keras.optimizers.schedules.ExponentialDecay(args.learning_rate, 18000, 0.9, staircase=True)
         optimizer = tf.keras.optimizers.SGD(learning_rate=schedulers, momentum=0.9)
 
         for epoch in range(1, args.epochs + 1):
-           
+            
             train_loss.reset_states()
             train_accuracy.reset_states()
             test_loss.reset_states()
