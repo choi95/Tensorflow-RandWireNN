@@ -7,10 +7,10 @@ from graph import RandomGraph
 # Reporting 1,
 # I don't know which one is better, between 'bias=False' and 'bias=True'
 class SeparableConv2d(tf.keras.layers.Layer):
-    def __init__(self, filters, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1, bias=True):
         super(SeparableConv2d, self).__init__()
-        self.conv = tf.keras.layers.Conv2D(filters, 3, stride, padding='same', name='SeparableConv')
-        self.pointwise = tf.keras.layers.Conv2D(filters, 1, stride, padding='valid', name='SeparableConv_Pointwise')
+        self.conv = tf.keras.layers.Conv2D(in_channels, 3, stride, padding='same', groups=in_channels, use_bias=bias)
+        self.pointwise = tf.keras.layers.Conv2D(out_channels, 1, stride, padding='valid', use_bias=bias)
 
     def call(self, x):
         out = self.conv(x)
@@ -20,10 +20,10 @@ class SeparableConv2d(tf.keras.layers.Layer):
 
 # ReLU-convolution-BN triplet
 class Unit(tf.keras.layers.Layer):
-    def __init__(self, filters, stride=1):
+    def __init__(self, in_channels, out_channels, stride=1):
         super(Unit, self).__init__()
         self.dropout_rate = 0.2
-        self.SeparableConv2d = SeparableConv2d(filters, stride=stride)
+        self.SeparableConv2d = SeparableConv2d(in_channels, out_channels, stride=stride)
         self.BatchNormalization = tf.keras.layers.BatchNormalization()
         self.ReLU = tf.keras.layers.ReLU()
         self.Dropout_rate = tf.keras.layers.Dropout(self.dropout_rate)
@@ -39,13 +39,13 @@ class Unit(tf.keras.layers.Layer):
 # Reporting 2,
 # In the paper, they said "The aggregation is done by weighted sum with learnable positive weights".
 class Node(tf.keras.layers.Layer):
-    def __init__(self, in_degree, filters, stride=1):
+    def __init__(self, in_degree, in_channels, out_channels, stride=1):
         super(Node, self).__init__()
         self.in_degree = in_degree
         if len(self.in_degree) > 1:
             # self.weights = nn.Parameter(torch.zeros(len(self.in_degree), requires_grad=True))
             self.w = tf.Variable(tf.ones(len(self.in_degree)))
-        self.unit = Unit(filters, stride=stride)
+        self.unit = Unit(in_channels, out_channels, stride=stride)
 
     def call(self, *input):
         if len(self.in_degree) > 1:
@@ -59,11 +59,12 @@ class Node(tf.keras.layers.Layer):
         
 class RandWire(tf.keras.layers.Layer):
 
-    def __init__(self, node_num, p, filters, graph_mode, is_train, name):
+    def __init__(self, node_num, p, in_channels, out_channels, graph_mode, is_train, name):
         super(RandWire, self).__init__()
         self.node_num = node_num
         self.p = p
-        self.filters = filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
         self.graph_mode = graph_mode
         self.is_train = is_train
         self.gname = name
@@ -76,12 +77,12 @@ class RandWire(tf.keras.layers.Layer):
             graph_node.save_random_graph(graph, self.gname)
         else:
             graph = graph_node.load_random_graph(self.gname)
-            self.nodes, self.in_edges = graph_node.get_graph_info(self.graph)
+            self.nodes, self.in_edges = graph_node.get_graph_info(graph)
         
         #define input Node
-        self.module_list = [Node(self.in_edges[0], self.filters, stride=2)]
+        self.module_list = [Node(self.in_edges[0], self.in_channels, self.out_channels, stride=2)]
         # define the rest Node
-        self.module_list.extend([Node(self.in_edges[node], self.filters) for node in self.nodes if node > 0])
+        self.module_list.extend([Node(self.in_edges[node], self.out_channels, self.out_channels) for node in self.nodes if node > 0])
 
     def call(self, x):
         memory = {}
