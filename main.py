@@ -71,8 +71,9 @@ def main():
 
     inputs = tf.keras.Input(shape=(32,32,3), batch_size=args.batch_size)
     output = custom_model(inputs)
+    custom_model.summary()
     model = tf.keras.Model(inputs, output)
-    
+
     max_test_acc = 0  
     train_loss_history = []
     accuracy_history = []
